@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>CloudRip</title>
+</head>
+<body>
+    <h1>CloudRip</h1>
+    <p id="status">Verbinde...</p>
+    <video id="stream" autoplay playsinline controls style="width:100%; max-width:1280px;"></video>
+
+    <script>
+        const status = document.getElementById("status");
+        const video = document.getElementById("stream");
+        let pc;
+
+        async function start() {
+            // 1. SDP Offer vom Server holen
+            const res = await fetch("/sdp");
+            const data = await res.json();
+
+            // 2. PeerConnection erstellen
+            pc = new RTCPeerConnection({
+                iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+            });
+
+            // 3. Video Stream anzeigen wenn er ankommt
+            pc.ontrack = (event) => {
+                console.log("ONTRACK!", event);
+                status.textContent = "Stream läuft!";
+                video.srcObject = event.streams[0];
+            };
+
+            // 4. ICE Candidates zum Server schicken
+            pc.onicecandidate = (event) => {
+                if (event.candidate) {
+                    fetch("/candidate", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            candidate: event.candidate.candidate,
+                            mid: event.candidate.sdpMid
+                        })
+                    });
+                }
+            };
+
+            pc.onconnectionstatechange = () => {
+                status.textContent = "Status: " + pc.connectionState;
+            };
+
+            // 5. Server Offer einlesen
+            pc.addTransceiver('video', { direction: 'recvonly' });
+            await pc.setRemoteDescription({ type: data.type, sdp: data.sdp });
+
+
+
+            // 6. Answer erstellen + zum Server schicken
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+
+            await fetch("/answer", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ sdp: answer.sdp, type: answer.type })
+            });
+
+            status.textContent = "Warte auf Stream...";
+        }
+
+        start().catch(e => {
+            status.textContent = "Fehler: " + e.message;
+            console.error(e);
+        });
+    </script>
+</body>
+</html>
