@@ -1,464 +1,281 @@
+//#include "docker.h"
 #include <stdio.h>
-#include <rtc/rtc.h>
 #include <string.h>
-#include <time.h>
+#include <sys/socket.h>
+#include <sys/un.h>
 #include <unistd.h>
-#include <stdbool.h>
-#include <microhttpd.h>
-#include <stdlib.h>
-#include "../include/docker.h"
-#include <pthread.h>
+#include <stdlib.h> 
+#include <stdio.h>
 
-#define MAX_CANDIDATES 16
-
-
-
-
-int pc;
-int videotrack;
-bool debug = true;
-bool connected = false;
-void **con_cls = NULL;
+typedef struct decodedCallback{
+    int mode;
+    int x[8];
+    int y[8];
+    int mousedown;
+    int mousebuttonid;
+} decodedCallback_t;
 
 
-int nrofcandidates = 0;
-char candidates[MAX_CANDIDATES][512];
-char candidate_mids[MAX_CANDIDATES][16];
+static int docker_connect() {
+    int sock = socket(AF_UNIX, SOCK_STREAM, 0);
+    if(sock < 0) return -1;
 
-typedef struct gs_sdpconfig{
-    int server_id;
-    char sdp[8192];
-    char type[16];
-} SdpConfig;
+    struct sockaddr_un addr = {0};
+    addr.sun_family = AF_UNIX;
+    strncpy(addr.sun_path, "/var/run/docker.sock", sizeof(addr.sun_path));
 
-// IVF Header Structs
-typedef struct {
-    char signature[4];   
-    uint16_t version;
-    uint16_t header_size;
-    char codec[4];       
-    uint16_t width;
-    uint16_t height;
-    uint32_t fps_num;
-    uint32_t fps_den;
-    uint32_t frame_count;
-    uint32_t unused;
-} IVFGlobalHeader;      
-
-typedef struct __attribute__((packed)) {
-    uint32_t frame_size;
-    uint64_t timestamp;
-} IVFFrameHeader;     
-
-
-char g_html[65536] = {0};
-
-
-SdpConfig g_sdp = {0};
-
-
-//custum stuff
-void onLocalDescription(int pc, const char *sdp, const char *type, void *user);
-void onLocalCandidate(int pc, const char *cand, const char *mid, void *user);
-void onStateChange(int pc, rtcState state, void *user);
-enum MHD_Result onRequest(void *cls, struct MHD_Connection *connection,
-              const char *url, const char *method,
-              const char *version, const char *upload_data,
-              size_t *upload_data_size, void **con_cls);
-void escapeJsonfromBrowser(const char *src, char *dst, size_t size);
-void escapeJsontoBrowser(const char *src, char *dst, size_t size);
-void *stream_loop(void *arg);
-char *fix_candidate(const char *candidate);
-void send_vp8_frame(int track, const char *frame, uint32_t size);
-
-
-int main(){
-
-    if(debug){
-    printf("IVFFrameHeader size: %zu (sollte 12 sein)\n", sizeof(IVFFrameHeader));
-    printf("IVFGlobalHeader size: %zu (sollte 32 sein)\n", sizeof(IVFGlobalHeader));
+    if(connect(sock, (struct sockaddr*)&addr, sizeof(addr)) < 0){
+        close(sock);
+        return -1;
     }
+    return sock;
+}
 
 
-    char container_id[65] = {0};
+int docker_create(const char *image,const char *username, const char *cmd, char **container_id){
+    int sock = docker_connect();
+    char request[1024];
+    char *response = calloc(1, 4096);
+    char *payload = calloc(1, 4096);
+    char *id;
+    char *id_end;
 
-    printf("Booting Cloudrip...\n");
-    rtcInitLogger(RTC_LOG_DEBUG, NULL);
+    snprintf(payload, 4096,
+    "{"
+    "\"Image\":\"%s\","
+    "\"Cmd\":[\"%s\"],"
+    "\"HostConfig\":{"
+        "\"Binds\":[\"/tmp/.X11-unix:/tmp/.X11-unix\"]"
+    "}"
+    "}",
+    image, cmd);
     
-    rtcConfiguration config = {0};
-    const char *stunServer = "stun:stun.l.google.com:19302";
-    config.iceServers = &stunServer;
-    config.iceServersCount = 1;
+    snprintf(request, sizeof(request),
+        "POST /containers/create?name=%s_vm HTTP/1.1\r\n"
+        "Host: localhost\r\n"
+        "Content-Type: application/json\r\n"
+        "Content-Length: %zu\r\n"
+        "\r\n"
+        "%s",
+        username, strlen(payload), payload);
 
-    if(debug) printf("[ D ] Stun Server Initialised!\n");
 
-    FILE *f = fopen("html/index.html", "r");
-    if(f == NULL){
-        printf("[ E ] index.html nicht gefunden!\n");
+    write(sock, request, strlen(request));
+    free(payload);
+
+    read(sock, response, 4096);
+
+
+    id = strstr(response, "\"Id\":\"");
+    if(id == NULL){
+        printf("[ E ] The Docker creation failed. This may be because the mashine exists already with that name!");
         return 1;
     }
-    fread(g_html, 1, sizeof(g_html), f);
-    fclose(f);
-    printf("[ I ] index.html geladen!\n");
+    fflush(stdout);
+    id += 6;
+    id_end = strstr(id, "\"");
+    *id_end = '\0';
+    strncpy(*container_id, id, 64);
 
+    close(sock);
+    return 0;
+}
 
-    pc = rtcCreatePeerConnection(&config);
+int docker_start(const char *username){
+    int sock = docker_connect();
+    char request[1024] = {0};
+    char response[4096];
+
+    snprintf(request, 1024, 
+        "POST /containers/%s_vm/start HTTP/1.1\r\n"
+        "Host: localhost\r\n"
+        "Content-Length: 0\r\n\r\n", username);
     
-    rtcSetLocalDescriptionCallback(pc, onLocalDescription);
-    rtcSetLocalCandidateCallback(pc, onLocalCandidate);
-    rtcSetStateChangeCallback(pc, onStateChange);
+    write(sock, request, strlen(request));
+
+    read(sock, response, 4096);
+    printf("[ D ]");
+    printf(response);
+    printf("\n");
+
+    close(sock);
+
+    return 0;
+}
+
+int docker_stop(const char *username){
+    int sock = docker_connect();
+    char request[1024] = {0};
+
+    snprintf(request, 1024, 
+        "POST /containers/%s_vm/stop HTTP/1.1\r\n"
+        "Host: localhost\r\n"
+        "Content-Length: 0\r\n\r\n", username);
     
-    //Dummy track
-    rtcTrackInit t = {0};
-    t.direction = RTC_DIRECTION_SENDONLY;
-    t.codec = RTC_CODEC_VP8;
-    t.payloadType = 96;
-    t.ssrc = 42;
-    t.name = "video";
-    t.msid = "stream1";
-    t.trackId = "video0";
-    t.profile = "profile-level-id=42e01f;level-asymmetry-allowed=1;packetization-mode=1";
-    videotrack = rtcAddTrackEx(pc, &t);
+    write(sock, request, strlen(request));
+    close(sock);
 
-    if(videotrack == -1){
-        printf("[ E ] Track init failed... LOL");
-        return 1;
-    }
+    return 0;
+}
 
-    rtcSetLocalDescription(pc, "offer");
-    
-    if(debug) printf("[ D ] Set Local Description!\n");
-    sleep(1);
+int docker_delete(const char *username){
+    int sock = docker_connect();
+    char request[1024] = {0};
+    snprintf(request, sizeof(request),
+        "DELETE /containers/%s_vm?force=true HTTP/1.1\r\n"
+        "Host: localhost\r\n"
+        "Content-Length: 0\r\n\r\n", username);
+    write(sock, request, strlen(request));
+    close(sock);
+    return 0;
+}
 
-    struct MHD_Daemon *server = MHD_start_daemon(
-        MHD_USE_THREAD_PER_CONNECTION,
-        8000, NULL, NULL,
-        &onRequest, NULL,
-        MHD_OPTION_END
-    );
+int docker_injekt_Keystroke(char *inputData){
 
-    if(server == NULL){
-        printf("[ E ] Error: Server Failed to start!");
-    }
 
-    getchar();
 
-    MHD_stop_daemon(server);
-    rtcDeletePeerConnection(pc);
+
+
     return 0;
 }
 
 
+decodedCallback_t docker_helper_ConvertInputData(char inputdata[]){
+    int mode;
+    char x[8] = {0};
+    char y[8] = {0};
+    char button[8] = {0};
+    char *result;
+    decodedCallback_t returnvalue = {0};
 
-void onLocalDescription(int pc, const char *sdp, const char *type, void *user){
-    if(debug) printf("[ D ] Started copying stuff\n");
-    g_sdp.server_id = 1;
-    strncpy(g_sdp.sdp, sdp, 8192);
-    strncpy(g_sdp.type, type, 16);
+    if(strstr(inputdata, "mousemove") != NULL){
+        mode = 0;
+    }else if(strstr(inputdata,"mousedown")!= NULL){
+        mode = 1;
 
-    if(debug){
-        printf("[ D ] SDP String: %s\n", g_sdp.sdp);
-        printf("[ D ] Type: %s\n", g_sdp.type);
+    }else if(strstr(inputdata, "keydown")!= NULL){
+        mode = 2;
+
+    }else if(strstr(inputdata, "wheel")!= NULL){
+        mode = 3;
+
     }
-}
 
 
-void onLocalCandidate(int pc, const char *cand, const char *mid, void *user){
-    if(nrofcandidates >= MAX_CANDIDATES) return;
-    
-    strncpy(candidates[nrofcandidates], cand, 512);
-    strncpy(candidate_mids[nrofcandidates], mid, 16);
-    nrofcandidates++;
-    
-    if(debug) printf("[ D ] Candidate %d: %s\n", nrofcandidates, cand);
+
+/*   Possible Input data formats
+
+{ "type": "mousemove", "x": 320, "y": 240 }
+{ "type": "mousedown", "button": 0, "x": 320, "y": 240 }
+{ "type": "keydown",   "key": "a", "code": "KeyA" }
+{ "type": "wheel",     "dx": 0,    "dy": 120 }*/ 
+    switch(mode) {
+        case 0:
 
 
-}
 
 
-void onStateChange(int pc, rtcState state, void *user){
-    switch(state){
-        case RTC_CONNECTING:
-            if(debug) printf("[ D ] Browser is connecting...\n");
-            break;
-        case RTC_CONNECTED:
-            connected = true;
-            printf("[ I ] Browser connected! Streaming is starting...\n");
-            pthread_t stream_thread;
-            char *container_id = 0;
+            fflush(stdout);
+            inputdata +=25; //skip 24 Letters to the right
+            result = strchr(inputdata, ',');
 
-            docker_create("cloudrip-container", "test", "sleep infinity", &container_id);
-            docker_start("test");
-            sleep(3);
-            pthread_create(&stream_thread, NULL, stream_loop, NULL);
-            break;
-        case RTC_DISCONNECTED:
-            connected = false;
-            printf("[ I ] Browser disconnected.\n");
-            docker_stop("test");
-            docker_delete("test");
-            break;
-        case RTC_FAILED:
-            printf("[ E ] Connection failed!\n");
-            break;
-        case RTC_CLOSED:
-            printf("[ I ] Connection closed.\n");
-            break;
-        default:
-            printf("[ E ] Default triggerd!");
-            break;
-    }
-}
-
-
-enum MHD_Result onRequest(void *cls, struct MHD_Connection *connection,
-              const char *url, const char *method,
-              const char *version, const char *upload_data,
-              size_t *upload_data_size, void **con_cls) {
-                if(strcmp(url, "/sdp") == 0 && strcmp(method, "GET") == 0){
-                    char json[16000];
-                    char escaped_sdp[9000];
-
-                    escapeJsontoBrowser(g_sdp.sdp, escaped_sdp, sizeof(escaped_sdp));
-
-                    snprintf(json, sizeof(json), "{\"sdp\":\"%s\",\"type\":\"%s\"}", escaped_sdp, g_sdp.type);
-
-                    struct MHD_Response *response = MHD_create_response_from_buffer_copy(strlen(json), json);
-
-                    MHD_queue_response(connection, MHD_HTTP_OK, response);
-                    MHD_destroy_response(response);
-
-                    return MHD_YES;
-                }else if(strcmp(url, "/") == 0){
-                    struct MHD_Response *response = MHD_create_response_from_buffer_copy(
-                        strlen(g_html), g_html);
-                    MHD_add_response_header(response, "Content-Type", "text/html");
-                    MHD_queue_response(connection, MHD_HTTP_OK, response);
-                    MHD_destroy_response(response);
-                    return MHD_YES;
-                }else if(strcmp(url, "/answer") == 0 && strcmp(method, "POST") == 0){
-                    if(*con_cls == NULL){
-                        char *buff = calloc(1,8192);
-                        *con_cls = (void*)buff;
-
-                        return MHD_YES;
-                    } else if(*upload_data_size > 0){
-                        strncat(*con_cls, upload_data, *upload_data_size);
-                        *upload_data_size = 0;
-
-                        return MHD_YES;
-                    }
-
-                    char *body = (char*)*con_cls;
-                    if(debug) printf("[ D ] Raw body: %s\n", (char*)*con_cls);
-                    free(*con_cls);
-                    *con_cls = NULL;
-                    
-                    char sdp_clean[8192];
-                    escapeJsonfromBrowser(body, sdp_clean, sizeof(sdp_clean));
-
-                    char *sdp_start = strstr(sdp_clean, "\"sdp\":\"");
-                    if(sdp_start){
-                        sdp_start += 7; // über "sdp":" drüberspringen
-                        char *sdp_end = strstr(sdp_start, "\",\"type\"");
-                        if(sdp_end) *sdp_end = '\0'; // String dort beenden
-                        rtcSetRemoteDescription(pc, sdp_start, "answer");
-                    }
-                    if(debug) printf("[ D ] Answer SDP: %s\n", sdp_start);
-
-                    struct MHD_Response *response = MHD_create_response_from_buffer_copy(2, "OK");
-                    MHD_queue_response(connection, MHD_HTTP_OK, response);
-                    MHD_destroy_response(response);
-                    return MHD_YES;
-                }else if(strcmp(url, "/candidate") == 0 && strcmp(method, "POST") == 0){
-                    if(*con_cls == NULL){
-                        char *buff = calloc(1,4096);
-                        *con_cls = (void*)buff;
-
-                        return MHD_YES;
-                    } else if(*upload_data_size > 0){
-                        strncat(*con_cls, upload_data, *upload_data_size);
-                        *upload_data_size = 0;
-
-                        return MHD_YES;
-                    }
-
-                    char *body = (char*)*con_cls;
-                    if(debug) printf("[ D ] Raw body: %s\n", (char*)*con_cls);
-                    
-
-                    free(*con_cls);
-                    *con_cls = NULL;
-
-
-                    char *cand_start = strstr(body, "\"candidate\":\"");
-                    char *mid_start = strstr(body, "\"mid\":\"");
-
-                    if(cand_start && mid_start){
-                        cand_start += 13;
-                        char *cand_end = strstr(cand_start, "\"");
-                        if(cand_end) *cand_end = '\0';
-
-                        mid_start += 7;
-                        char *mid_end = strstr(mid_start, "\"");
-                        if(mid_end) *mid_end = '\0';
-
-                        if(debug) printf("[ D ] Remote Candidate: %s\n", cand_start);
-                        if(strlen(cand_start) == 0) {
-                        } else {
-                            const char *clean = fix_candidate(cand_start);
-                            rtcAddRemoteCandidate(pc, clean, mid_start);
-                        }
-                    }
-
-                    struct MHD_Response *response = MHD_create_response_from_buffer_copy(2, "OK");
-                    MHD_queue_response(connection, MHD_HTTP_OK, response);
-                    MHD_destroy_response(response);
-                    return MHD_YES;
+             if(result != NULL){
+                for(int i = 0; i<strlen(inputdata) - strlen(result); i++){
+                    x[i] = inputdata[i];
                 }
 
+                printf("[ I ] y=%s\n", x);
+                
+            }else{
+                printf("[ E ] WHAT... \n");
+            }
 
-                return MHD_NO;
-              }
+            inputdata += strlen(inputdata) - strlen(result) +5; //skip 24 Letters to the right
+            result = strchr(inputdata, '}');
 
-void escapeJsonfromBrowser(const char *src, char *dst, size_t size){
-    size_t j = 0;
-    for(size_t i = 0; src[i] && j < size-1; i++){
-        if(src[i] == '\\' && src[i+1] == 'n'){
-            dst[j++] = '\n';
-            i++;              
-        } else if(src[i] == '\\' && src[i+1] == 'r'){
-            dst[j++] = '\r';
-            i++;
-        } else {
-            dst[j++] = src[i];
-        }
-    }
-    dst[j] = '\0';
-}
+            if(result != NULL){
+                for(int i = 0; i<strlen(inputdata) - strlen(result); i++){
+                    y[i] = inputdata[i];
+                }
 
-void escapeJsontoBrowser(const char *src, char *dst, size_t size){
-    size_t j = 0;
-    for(size_t i = 0; src[i] && j < size-2; i++){
-        if(src[i] == '\n'){        
-            dst[j++] = '\\';       
-            dst[j++] = 'n';        
-        }else if(src[i] == '\r'){  
-            dst[j++] = '\\';
-            dst[j++] = 'r';
-        } else {
-            dst[j++] = src[i];
-        }
-    }
-    dst[j] = '\0';
-}
+                printf("[ I ] y=%s\n", y);
+                
+            }else{
+                printf("[ E ] WHAT... \n");
+            }
+            fflush(stdout);
+            *returnvalue.x = (int)*x;
+            *returnvalue.y = (int)*y;
+            returnvalue.mode = 0;
 
-void *stream_loop(void *arg) {
-    FILE *ffmpeg = popen(
-        "ffmpeg -f x11grab -i :99 "
-        "-vf scale=640:360 "
-        "-c:v libvpx -b:v 300k -g 30 -keyint_min 30 "
-        "-fflags +flush_packets "
-        "-f ivf pipe:1 2>/dev/null",
-        "r"
-    );
-
-    IVFGlobalHeader gh;
-    if (fread(&gh, sizeof(gh), 1, ffmpeg) != 1) { 
-        printf("[ E ] IVF Header read failed!\n"); 
-        return NULL; 
-    }
-    printf("[ D ] ffmpeg is running, starting Loop...\n");
-
-    while(connected){
-        IVFFrameHeader fh;
-        if (fread(&fh, sizeof(fh), 1, ffmpeg) != 1) {
-            printf("[ E ] Frame Header read failed! ffmpeg dead?\n");
             break;
-        }
-        char *frame = malloc(fh.frame_size);
-        if (fread(frame, fh.frame_size, 1, ffmpeg) != 1) {
-            printf("[ E ] Frame data read failed!\n");
-            free(frame);
+        case 1:
+
+            inputdata +=29; //skip 29 Letters to the right
+            result = strchr(inputdata, ',');
+
+            if(result != NULL){
+                for(int i = 0; i<strlen(inputdata) - strlen(result); i++){
+                    button[i] = inputdata[i];
+                }
+
+                printf("[ I ] Button_ID=%s\n", button);
+                
+            }else{
+                printf("[ E ] WHAT... \n");
+            }
+
+            inputdata += strlen(inputdata) - strlen(result) +5; //skip 5 Letters to the right
+            result = strchr(inputdata, ',');
+
+            if(result != NULL){
+                for(int i = 0; i<strlen(inputdata) - strlen(result); i++){
+                    x[i] = inputdata[i];
+                }
+
+                printf("[ I ] x=%s\n", x);
+                
+            }else{
+                printf("[ E ] WHAT... \n");
+            }
+
+
+                        inputdata += strlen(inputdata) - strlen(result) +5; //skip 5 Letters to the right
+            result = strchr(inputdata, '}');
+
+            if(result != NULL){
+                for(int i = 0; i<strlen(inputdata) - strlen(result); i++){
+                    y[i] = inputdata[i];
+                }
+
+                printf("[ I ] y=%s\n", y);
+                
+            }else{
+                printf("[ E ] WHAT... \n");
+            }
+
+
+            fflush(stdout);
+            *returnvalue.x = *x - '0';
+            *returnvalue.y = *y - '0';
+            returnvalue.mousedown = 1;
+            returnvalue.mousebuttonid = *button - '0';
+            returnvalue.mode = 1;
+
             break;
-        }
-        send_vp8_frame(videotrack, frame, fh.frame_size);
-        free(frame);
+
     }
-    printf("[ D ] Stream Loop stopped\n");
-    return NULL;
+
+    return returnvalue;
+
 }
 
+int main(){
+    decodedCallback_t value;
 
-char *fix_candidate(const char *candidate) {
-    static char fixed[512];
-    strncpy(fixed, candidate, sizeof(fixed) - 1);
-    
-    
-    char *gen = strstr(fixed, " generation ");
-    if (gen) *gen = '\0';
-    
-    return fixed;
-}
-
-void send_vp8_frame(int track, const char *frame, uint32_t size){
-    static uint16_t seq = 0;
-    static uint32_t timestamp = 0;
-    uint32_t offset = 0;
+    value = docker_helper_ConvertInputData("{\"type\":\"mousedown\",\"button\":1,\"x\":0,\"y\":1000}");
 
 
-    int buffered = rtcGetBufferedAmount(track);
-    if (buffered < 0 || buffered > 500000) { 
-        printf("[ W ] Buffer FULL (%d bytes), Frame DROPPED\n", buffered);
-        timestamp += 3000;
-        return;
-    }
-
-
-    while(offset < size){
-        uint32_t chunk = size - offset;
-        if(chunk > 1100){
-            chunk = 1100;
-        }
-
-        bool isfirst = (offset == 0);
-        bool islast = ((offset + chunk) >= size); 
-
-        uint8_t packet[1200] = {0};
-
-        packet[0] = 0x80;
-        packet[1] = (islast ? 0x80 : 0x00) | 96;
-        packet[2] = (seq >> 8) & 0xFF;
-        packet[3] = seq & 0xFF;
-        packet[4] = (timestamp >> 24) & 0xFF;
-        packet[5] = (timestamp >> 16) & 0xFF;
-        packet[6] = (timestamp >> 8) & 0xFF;
-        packet[7] = timestamp & 0xFF;
-        packet[8] = 0;
-        packet[9] = 0;
-        packet[10] = 0;
-        packet[11] = 42;
-
-        packet[12] = isfirst ? 0x10:0x00;
-
-        memcpy(packet + 13, frame + offset, chunk);
-
-        int ret = rtcSendMessage(track, (char*)packet, chunk + 13);
-        if (ret < 0) {
-            printf("[ W ] Send buffer voll, Frame gedroppt\n");
-            timestamp += 3000;
-            return;
-        }
-
-        printf("[ D ] Sent Packet!\n");
-
-        offset +=chunk;
-        seq++;
-
-        if(islast) printf("[ D ] FInished sending packets!\n");
-
-    }
-    timestamp += 3000;
-    usleep(33000);
-
+    printf("x=%i, y=%i, Mousedown=%i, MouseButtonID=%i\n", value.x, value.y, value.mousedown, value.mousebuttonid);
+    return 0;
 }

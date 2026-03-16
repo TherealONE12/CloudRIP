@@ -3,75 +3,139 @@
 <head>
     <meta charset="UTF-8">
     <title>CloudRip</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #0a0a0a;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            font-family: monospace;
+            color: #ccc;
+        }
+        #status { margin-bottom: 10px; font-size: 13px; color: #888; }
+        #container { position: relative; display: inline-block; border: 1px solid #333; }
+        #stream { display: block; width: 640px; height: 360px; background: #111; cursor: none; }
+        #cursor {
+            position: absolute;
+            width: 12px; height: 12px;
+            border: 2px solid #fff;
+            border-radius: 50%;
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            mix-blend-mode: difference;
+        }
+        button {
+            margin-top: 12px;
+            background: #1a1a1a; border: 1px solid #444;
+            color: #ccc; padding: 8px 24px;
+            font-family: monospace; cursor: pointer; font-size: 13px;
+        }
+        button:hover { border-color: #888; color: #fff; }
+    </style>
 </head>
 <body>
-    <h1>CloudRip</h1>
-    <p id="status">Verbinde...</p>
-    <video id="stream" autoplay playsinline controls style="width:100%; max-width:1280px;"></video>
+    <div id="status">Bereit.</div>
+    <div id="container">
+        <video id="stream" autoplay playsinline muted></video>
+        <div id="cursor"></div>
+    </div>
+    <button onclick="start()">&#9654; Verbinden</button>
 
-    <script>
-        const status = document.getElementById("status");
-        const video = document.getElementById("stream");
-        let pc;
+<script>
+let pc;
+const status    = document.getElementById('status');
+const video     = document.getElementById('stream');
+const cursor    = document.getElementById('cursor');
 
-        async function start() {
-            // 1. SDP Offer vom Server holen
-            const res = await fetch("/sdp");
-            const data = await res.json();
+function sendInput(data) {
+    fetch('/input', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    }).catch(() => {});
+}
 
-            // 2. PeerConnection erstellen
-            pc = new RTCPeerConnection({
-                iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+function getPos(e) {
+    const rect = video.getBoundingClientRect();
+    const scaleX = video.videoWidth  / rect.width  || 1;
+    const scaleY = video.videoHeight / rect.height || 1;
+    return {
+        x: Math.round((e.clientX - rect.left) * scaleX),
+        y: Math.round((e.clientY - rect.top)  * scaleY)
+    };
+}
+
+video.addEventListener('mousemove', e => {
+    const {x, y} = getPos(e);
+    cursor.style.left = (e.clientX - video.getBoundingClientRect().left) + 'px';
+    cursor.style.top  = (e.clientY - video.getBoundingClientRect().top)  + 'px';
+    sendInput({ type: 'mousemove', x, y });
+});
+
+video.addEventListener('mousedown', e => {
+    const {x, y} = getPos(e);
+    sendInput({ type: 'mousedown', button: e.button, x, y });
+});
+
+video.addEventListener('mouseup', e => {
+    const {x, y} = getPos(e);
+    sendInput({ type: 'mouseup', button: e.button, x, y });
+});
+
+video.addEventListener('wheel', e => {
+    e.preventDefault();
+    sendInput({ type: 'wheel', dx: Math.round(e.deltaX), dy: Math.round(e.deltaY) });
+}, { passive: false });
+
+video.addEventListener('contextmenu', e => e.preventDefault());
+
+video.setAttribute('tabindex', '0');
+video.addEventListener('keydown', e => {
+    e.preventDefault();
+    sendInput({ type: 'keydown', key: e.key, code: e.code });
+});
+video.addEventListener('keyup', e => {
+    e.preventDefault();
+    sendInput({ type: 'keyup', key: e.key, code: e.code });
+});
+
+async function start() {
+    status.textContent = 'Verbinde...';
+    const res  = await fetch('/sdp');
+    const data = await res.json();
+
+    pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+
+    pc.ontrack = (event) => {
+        status.textContent = 'Stream läuft!';
+        video.srcObject = event.streams[0];
+        video.focus();
+    };
+
+    pc.onicecandidate = (event) => {
+        if (event.candidate) {
+            fetch('/candidate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ candidate: event.candidate.candidate, mid: event.candidate.sdpMid })
             });
-
-            // 3. Video Stream anzeigen wenn er ankommt
-            pc.ontrack = (event) => {
-                console.log("ONTRACK!", event);
-                status.textContent = "Stream läuft!";
-                video.srcObject = event.streams[0];
-            };
-
-            // 4. ICE Candidates zum Server schicken
-            pc.onicecandidate = (event) => {
-                if (event.candidate) {
-                    fetch("/candidate", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            candidate: event.candidate.candidate,
-                            mid: event.candidate.sdpMid
-                        })
-                    });
-                }
-            };
-
-            pc.onconnectionstatechange = () => {
-                status.textContent = "Status: " + pc.connectionState;
-            };
-
-            // 5. Server Offer einlesen
-            pc.addTransceiver('video', { direction: 'recvonly' });
-            await pc.setRemoteDescription({ type: data.type, sdp: data.sdp });
-
-
-
-            // 6. Answer erstellen + zum Server schicken
-            const answer = await pc.createAnswer();
-            await pc.setLocalDescription(answer);
-
-            await fetch("/answer", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ sdp: answer.sdp, type: answer.type })
-            });
-
-            status.textContent = "Warte auf Stream...";
         }
+    };
 
-        start().catch(e => {
-            status.textContent = "Fehler: " + e.message;
-            console.error(e);
-        });
-    </script>
+    pc.onconnectionstatechange = () => { status.textContent = 'Status: ' + pc.connectionState; };
+
+    await pc.setRemoteDescription({ type: data.type, sdp: data.sdp });
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    await fetch('/answer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sdp: answer.sdp, type: answer.type })
+    });
+}
+</script>
 </body>
 </html>
