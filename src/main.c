@@ -9,8 +9,8 @@
 
 typedef struct decodedCallback{
     int mode;
-    int x[8];
-    int y[8];
+    int x;
+    int y;
     int mousedown;
     int mousebuttonid;
 } decodedCallback_t;
@@ -171,10 +171,7 @@ decodedCallback_t docker_helper_ConvertInputData(char inputdata[]){
 { "type": "wheel",     "dx": 0,    "dy": 120 }*/ 
     switch(mode) {
         case 0:
-
-
-
-
+                        
             fflush(stdout);
             inputdata +=25; //skip 24 Letters to the right
             result = strchr(inputdata, ',');
@@ -195,7 +192,8 @@ decodedCallback_t docker_helper_ConvertInputData(char inputdata[]){
 
             if(result != NULL){
                 for(int i = 0; i<strlen(inputdata) - strlen(result); i++){
-                    y[i] = inputdata[i];
+                    y[i] = inputdata[i]; 
+                    
                 }
 
                 printf("[ I ] y=%s\n", y);
@@ -204,8 +202,8 @@ decodedCallback_t docker_helper_ConvertInputData(char inputdata[]){
                 printf("[ E ] WHAT... \n");
             }
             fflush(stdout);
-            *returnvalue.x = (int)*x;
-            *returnvalue.y = (int)*y;
+            returnvalue.x = atoi(x);
+            returnvalue.y = atoi(y);
             returnvalue.mode = 0;
 
             break;
@@ -256,10 +254,10 @@ decodedCallback_t docker_helper_ConvertInputData(char inputdata[]){
 
 
             fflush(stdout);
-            *returnvalue.x = *x - '0';
-            *returnvalue.y = *y - '0';
+            returnvalue.x = atoi(x);
+            returnvalue.y = atoi(y);
             returnvalue.mousedown = 1;
-            returnvalue.mousebuttonid = *button - '0';
+            returnvalue.mousebuttonid = atoi(button);
             returnvalue.mode = 1;
 
             break;
@@ -273,7 +271,7 @@ decodedCallback_t docker_helper_ConvertInputData(char inputdata[]){
 int main(){
     decodedCallback_t value;
 
-    value = docker_helper_ConvertInputData("{\"type\":\"mousedown\",\"button\":1,\"x\":0,\"y\":1000}");
+    value = docker_helper_ConvertInputData("{\"type\":\"mousedown\",\"button\":2,\"x\":67,\"y\":420}");
 
 
     printf("x=%i, y=%i, Mousedown=%i, MouseButtonID=%i\n", value.x, value.y, value.mousedown, value.mousebuttonid);
