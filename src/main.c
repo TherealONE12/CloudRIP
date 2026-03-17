@@ -13,6 +13,10 @@ typedef struct decodedCallback{
     int y;
     int mousedown;
     int mousebuttonid;
+    char key[2];
+    char keycoode[8];
+    int dx;
+    int dy;
 } decodedCallback_t;
 
 
@@ -141,12 +145,17 @@ int docker_injekt_Keystroke(char *inputData){
 
 
 decodedCallback_t docker_helper_ConvertInputData(char inputdata[]){
+    decodedCallback_t returnvalue = {0};
     int mode;
     char x[8] = {0};
     char y[8] = {0};
     char button[8] = {0};
     char *result;
-    decodedCallback_t returnvalue = {0};
+    char key[2] = {0};
+    char keycoode[8] = {0};
+    char dx[8] = {0};
+    char dy[8] = {0};
+
 
     if(strstr(inputdata, "mousemove") != NULL){
         mode = 0;
@@ -163,17 +172,22 @@ decodedCallback_t docker_helper_ConvertInputData(char inputdata[]){
 
 
 
-/*   Possible Input data formats
+/*         REQUIRED Input data formats
+    IMPORTANT: Only these, ABSOLUTLY NO SPACES!
 
-{ "type": "mousemove", "x": 320, "y": 240 }
-{ "type": "mousedown", "button": 0, "x": 320, "y": 240 }
-{ "type": "keydown",   "key": "a", "code": "KeyA" }
-{ "type": "wheel",     "dx": 0,    "dy": 120 }*/ 
+
+{"type":"mousemove","x":320,"y":240}
+{"type":"mousedown","button":0,"x":320,"y":240}
+{"type":"keydown","key":"a","code":"KeyA"}
+{"type":"wheel","dx":0,"dy":120}*/ 
+
+
+
     switch(mode) {
         case 0:
                         
             fflush(stdout);
-            inputdata +=25; //skip 24 Letters to the right
+            inputdata +=25; //skip 25 Letters to the right
             result = strchr(inputdata, ',');
 
              if(result != NULL){
@@ -187,7 +201,7 @@ decodedCallback_t docker_helper_ConvertInputData(char inputdata[]){
                 printf("[ E ] WHAT... \n");
             }
 
-            inputdata += strlen(inputdata) - strlen(result) +5; //skip 24 Letters to the right
+            inputdata += strlen(inputdata) - strlen(result) +5; //skip 5 Letters to the right
             result = strchr(inputdata, '}');
 
             if(result != NULL){
@@ -238,7 +252,7 @@ decodedCallback_t docker_helper_ConvertInputData(char inputdata[]){
             }
 
 
-                        inputdata += strlen(inputdata) - strlen(result) +5; //skip 5 Letters to the right
+            inputdata += strlen(inputdata) - strlen(result) +5; //skip 5 Letters to the right
             result = strchr(inputdata, '}');
 
             if(result != NULL){
@@ -261,7 +275,79 @@ decodedCallback_t docker_helper_ConvertInputData(char inputdata[]){
             returnvalue.mode = 1;
 
             break;
+        case 2:
 
+            inputdata +=25; //skip 25 Letters to the right
+            result = strchr(inputdata, '\"');
+
+            if(result != NULL){
+                strncpy(key, inputdata, 1);
+                //key = inputdata[strlen(inputdata) - strlen(result)];
+
+                printf("[ I ] key=%s\n", key);
+                
+            }else{
+                printf("[ E ] WHAT... \n");
+            }
+
+            inputdata += strlen(inputdata) - strlen(result) +10; //skip 10 Letters to the right
+            result = strchr(inputdata, '\"');
+
+            if(result != NULL){
+                for(int i = 0; i<strlen(inputdata) - strlen(result); i++){
+                    keycoode[i] = inputdata[i];
+                }
+
+                printf("[ I ] x=%s\n", keycoode);
+                
+            }else{
+                printf("[ E ] WHAT... \n");
+            }
+
+
+            fflush(stdout);
+            strncpy(returnvalue.key, key, strlen(key));
+            strncpy(returnvalue.keycoode, keycoode, strlen(keycoode));
+            returnvalue.mode = 2;
+
+            break;
+        case 3:
+                        
+            fflush(stdout);
+            inputdata +=21; //skip 21 Letters to the right
+            result = strchr(inputdata, ',');
+
+             if(result != NULL){
+                for(int i = 0; i<strlen(inputdata) - strlen(result); i++){
+                    dx[i] = inputdata[i];
+                }
+
+                printf("[ I ] y=%s\n", dx);
+                
+            }else{
+                printf("[ E ] WHAT... \n");
+            }
+
+            inputdata += strlen(inputdata) - strlen(result) +6; //skip 6 Letters to the right
+            result = strchr(inputdata, '}');
+
+            if(result != NULL){
+                for(int i = 0; i<strlen(inputdata) - strlen(result); i++){
+                    dy[i] = inputdata[i]; 
+                    
+                }
+
+                printf("[ I ] y=%s\n", dy);
+                
+            }else{
+                printf("[ E ] WHAT... \n");
+            }
+            fflush(stdout);
+            returnvalue.dx = atoi(dx);
+            returnvalue.dy = atoi(dy);
+            returnvalue.mode = 3;
+
+            break;
     }
 
     return returnvalue;
@@ -271,9 +357,9 @@ decodedCallback_t docker_helper_ConvertInputData(char inputdata[]){
 int main(){
     decodedCallback_t value;
 
-    value = docker_helper_ConvertInputData("{\"type\":\"mousedown\",\"button\":2,\"x\":67,\"y\":420}");
+    value = docker_helper_ConvertInputData("{\"type\":\"wheel\",\"dx\":16,\"dy\":400}");
 
 
-    printf("x=%i, y=%i, Mousedown=%i, MouseButtonID=%i\n", value.x, value.y, value.mousedown, value.mousebuttonid);
+    printf("x=%i, y=%i, Mousedown=%i, MouseButtonID=%i, KeyCoode=%s, Key=%s, dx=%i, dy=%i\n", value.x, value.y, value.mousedown, value.mousebuttonid, value.keycoode, value.key, value.dx, value.dy);
     return 0;
 }
