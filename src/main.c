@@ -15,6 +15,7 @@ typedef struct decodedCallback{
     int mousebuttonid;
     char key[2];
     char keycoode[8];
+    int keyup;
     int dx;
     int dy;
 } decodedCallback_t;
@@ -134,14 +135,6 @@ int docker_delete(const char *username){
     return 0;
 }
 
-int docker_injekt_Keystroke(char *inputData){
-
-
-
-
-
-    return 0;
-}
 
 
 decodedCallback_t docker_helper_ConvertInputData(char inputdata[]){
@@ -354,12 +347,101 @@ decodedCallback_t docker_helper_ConvertInputData(char inputdata[]){
 
 }
 
+int docker_injekt_Keystroke(char *inputData, int *needskeyup, decodedCallback_t *keyUpSafe){
+    decodedCallback_t injektion = {0};
+    int ret;
+    char command[32];
+    char command2[32];
+    injektion = docker_helper_ConvertInputData(inputData);
+
+    switch(injektion.mode){
+        case 0:
+             command[16];
+            snprintf(command, sizeof(command), "xdotool mousemove --window 99 %i %i", injektion.x, injektion.y);
+
+            //execute it
+            ret = system(command) / 256;
+
+            if(ret != 0){
+                printf("[ E ] Command %s Failed with coode %i\n", command, ret);
+            }
+
+            *needskeyup = 0;
+            break;
+        case 1:
+             command[16];
+            snprintf(command, sizeof(command), "xdotool click --window 99 %i", injektion.mousebuttonid);
+
+            //execute it
+            ret = system(command) / 256;
+
+            if(ret != 0){
+                printf("[ E ] Command %s Failed with coode %i\n", command, ret);
+            }
+
+
+
+            *needskeyup = 0;
+            break;
+        case 2:
+             command[32];
+             command2[32];
+
+            if(*keyUpSafe->keycoode == injektion.keycoode){
+                *needskeyup = 0;
+            }
+
+
+            if(*needskeyup){
+                snprintf(command2, sizeof(command), "xdotool keyup --window 99 %i ", *keyUpSafe->keycoode);
+            }
+
+            snprintf(command, sizeof(command), "xdotool keydown --window 99 %i ", injektion.keycoode);
+            
+            //execute them
+            ret = system(command) / 256;
+
+            if(ret != 0){
+                printf("[ E ] Command %s Failed with coode %i\n", command, ret);
+            }
+
+            ret = system(command2) / 256;
+
+            if(ret != 0){
+                printf("[ E ] Command %s Failed with coode %i\n", command2, ret);
+            }
+
+
+            if(!needskeyup){
+            *needskeyup = 1;
+            *keyUpSafe = injektion;
+            }
+
+            break;
+        case 3:
+            
+
+            //execute it
+            if(ret != 0){
+                printf("[ I ] Uhhhh yeah, mousescrollthing is not supported, ups...\n");
+            }
+            *needskeyup = 0;
+            break;
+    }
+
+
+
+    return 0;
+}
+
+
 int main(){
     decodedCallback_t value;
+    int iskeyup;
+    decodedCallback_t nminus1safe;
 
-    value = docker_helper_ConvertInputData("{\"type\":\"wheel\",\"dx\":16,\"dy\":400}");
+    docker_injekt_Keystroke("{\"type\":\"mousemove\",\"x\":320,\"y\":240}", &iskeyup, &nminus1safe);
 
 
-    printf("x=%i, y=%i, Mousedown=%i, MouseButtonID=%i, KeyCoode=%s, Key=%s, dx=%i, dy=%i\n", value.x, value.y, value.mousedown, value.mousebuttonid, value.keycoode, value.key, value.dx, value.dy);
     return 0;
 }
