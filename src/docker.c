@@ -339,14 +339,14 @@ decodedCallback_t docker_helper_ConvertInputData(char inputdata[]){
 int docker_injekt_Keystroke(char *inputData, int *needskeyup, decodedCallback_t *keyUpSafe){
     decodedCallback_t injektion = {0};
     int ret;
-    char command[32];
-    char command2[32];
+    char command[64];
+    char command2[64];
     injektion = docker_helper_ConvertInputData(inputData);
 
     switch(injektion.mode){
         case 0:
-             command[16];
-            snprintf(command, sizeof(command), "xdotool mousemove %i %i", injektion.x, injektion.y);
+            
+            snprintf(command, sizeof(command), "DISPLAY=:99 xdotool mousemove %i %i", injektion.x, injektion.y);
 
             //execute it
             ret = system(command) / 256;
@@ -362,8 +362,8 @@ int docker_injekt_Keystroke(char *inputData, int *needskeyup, decodedCallback_t 
             *needskeyup = 0;
             break;
         case 1:
-             command[16];
-            snprintf(command, sizeof(command), "xdotool click %i", injektion.mousebuttonid);
+          
+            snprintf(command, sizeof(command), "DISPLAY=:99 xdotool click %i", injektion.mousebuttonid);
 
             //execute it
             ret = system(command) / 256;
@@ -377,8 +377,6 @@ int docker_injekt_Keystroke(char *inputData, int *needskeyup, decodedCallback_t 
             *needskeyup = 0;
             break;
         case 2:
-             command[32];
-             command2[32];
 
             if(*keyUpSafe->keycoode == injektion.keycoode){
                 *needskeyup = 0;
@@ -386,10 +384,10 @@ int docker_injekt_Keystroke(char *inputData, int *needskeyup, decodedCallback_t 
 
 
             if(*needskeyup){
-                snprintf(command2, sizeof(command), "xdotool keyup %i ", *keyUpSafe->keycoode);
+                snprintf(command2, sizeof(command), "DISPLAY=:99 xdotool keyup %i ", *keyUpSafe->keycoode);
             }
 
-            snprintf(command, sizeof(command), "xdotool keydown %i ", injektion.keycoode);
+            snprintf(command, sizeof(command), "DISPLAY=:99 xdotool keydown %i ", injektion.keycoode);
             
             //execute them
             ret = system(command) / 256;
