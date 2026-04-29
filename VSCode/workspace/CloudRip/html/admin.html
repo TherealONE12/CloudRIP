@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CloudRip - Admin Panel</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .admin-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+            border-bottom: 2px solid #0f3460;
+            padding-bottom: 20px;
+        }
+
+        h1 {
+            font-size: 28px;
+            color: #00d4ff;
+        }
+
+        .logout-btn {
+            background: #ff4444;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .logout-btn:hover {
+            background: #ff6666;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            border-bottom: 1px solid #0f3460;
+        }
+
+        .tab-btn {
+            padding: 12px 20px;
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid transparent;
+            color: #888;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        .tab-btn.active {
+            color: #00d4ff;
+            border-bottom-color: #00d4ff;
+        }
+
+        .tab-btn:hover {
+            color: #00d4ff;
+        }
+
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .form-section {
+            background: rgba(22, 33, 62, 0.8);
+            border: 1px solid #0f3460;
+            border-radius: 10px;
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #a0a0a0;
+            font-weight: 500;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            background: #0f1419;
+            border: 1px solid #0f3460;
+            border-radius: 5px;
+            color: #e0e0e0;
+            font-size: 14px;
+            font-family: monospace;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #00d4ff;
+            box-shadow: 0 0 10px rgba(0, 212, 255, 0.2);
+        }
+
+        .btn {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #00d4ff 0%, #0099cc 100%);
+            border: none;
+            border-radius: 5px;
+            color: #000;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 212, 255, 0.3);
+        }
+
+        .btn.danger {
+            background: linear-gradient(135deg, #ff4444 0%, #cc0000 100%);
+            color: white;
+        }
+
+        .btn.danger:hover {
+            box-shadow: 0 8px 20px rgba(255, 0, 0, 0.3);
+        }
+
+        .games-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .game-card {
+            background: rgba(22, 33, 62, 0.8);
+            border: 1px solid #0f3460;
+            border-radius: 10px;
+            padding: 20px;
+            transition: all 0.3s;
+        }
+
+        .game-card:hover {
+            border-color: #00d4ff;
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
+        }
+
+        .game-card h3 {
+            color: #00d4ff;
+            margin-bottom: 10px;
+        }
+
+        .game-card p {
+            color: #888;
+            font-size: 12px;
+            margin-bottom: 10px;
+        }
+
+        .game-card .status {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            margin-bottom: 10px;
+        }
+
+        .game-card .status.active {
+            background: rgba(0, 255, 0, 0.1);
+            color: #88ff88;
+            border: 1px solid #44ff44;
+        }
+
+        .game-card .status.inactive {
+            background: rgba(255, 100, 100, 0.1);
+            color: #ff8888;
+            border: 1px solid #ff4444;
+        }
+
+        .game-card .cmd {
+            background: #0f1419;
+            padding: 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            color: #00ff00;
+            font-family: monospace;
+            word-break: break-all;
+            margin-bottom: 10px;
+        }
+
+        .game-card .actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .game-card .actions button {
+            flex: 1;
+            padding: 8px;
+            font-size: 12px;
+        }
+
+        .logs-container {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .log-entry {
+            background: rgba(22, 33, 62, 0.5);
+            border-left: 3px solid #0f3460;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            font-size: 13px;
+        }
+
+        .log-entry.login {
+            border-left-color: #00d4ff;
+        }
+
+        .log-entry.start {
+            border-left-color: #44ff44;
+        }
+
+        .log-entry.stop {
+            border-left-color: #ff8888;
+        }
+
+        .log-entry.error {
+            border-left-color: #ffaa00;
+        }
+
+        .log-time {
+            color: #888;
+            font-size: 11px;
+        }
+
+        .log-user {
+            color: #00d4ff;
+            font-weight: bold;
+        }
+
+        .message {
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            display: none;
+        }
+
+        .message.error {
+            background: rgba(255, 0, 0, 0.1);
+            border: 1px solid #ff4444;
+            color: #ff8888;
+        }
+
+        .message.success {
+            background: rgba(0, 255, 0, 0.1);
+            border: 1px solid #44ff44;
+            color: #88ff88;
+        }
+
+        .message.info {
+            background: rgba(0, 212, 255, 0.1);
+            border: 1px solid #00d4ff;
+            color: #88ddff;
+        }
+
+        .loading {
+            text-align: center;
+            color: #888;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #0f3460;
+            border-top-color: #00d4ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .login-required {
+            text-align: center;
+            padding: 40px;
+            color: #ff8888;
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <header>
+            <h1>⚙️ Admin Panel</h1>
+            <button class="logout-btn" onclick="logout()">Logout</button>
+        </header>
+
+        <div class="message" id="message"></div>
+
+        <div id="loginRequired" class="login-required hidden">
+            <h2>Authentifizierung erforderlich</h2>
+            <p>Bitte Passwort eingeben:</p>
+            <input type="password" id="adminPassword" placeholder="Admin Password">
+            <button class="btn" onclick="authenticateAdmin()" style="margin-top: 20px;">Authentifizieren</button>
+        </div>
+
+        <div id="adminPanel" class="hidden">
+            <div class="tabs">
+                <button class="tab-btn active" onclick="switchTab('games')">📦 Games</button>
+                <button class="tab-btn" onclick="switchTab('logs')">📋 Logs</button>
+            </div>
+
+            <!-- Games Tab -->
+            <div class="tab-content active" id="gamesTab">
+                <div class="form-section">
+                    <h2 style="margin-bottom: 20px; color: #00d4ff;">Neues Game hinzufügen</h2>
+                    <form onsubmit="addGame(event)">
+                        <div class="form-group">
+                            <label>Game Name</label>
+                            <input type="text" id="gameName" placeholder="z.B. Terminal" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Beschreibung</label>
+                            <textarea id="gameDesc" placeholder="Kurze Beschreibung" required></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Launch Command</label>
+                            <input type="text" id="gameCmd" placeholder="z.B. xterm" required>
+                        </div>
+                        <button type="submit" class="btn">Game hinzufügen</button>
+                    </form>
+                </div>
+
+                <h2 style="margin-bottom: 20px; color: #00d4ff;">Verfügbare Games</h2>
+                <div class="games-grid" id="gamesList">
+                    <div class="loading"><div class="spinner"></div> Lädt...</div>
+                </div>
+            </div>
+
+            <!-- Logs Tab -->
+            <div class="tab-content" id="logsTab">
+                <div class="form-section">
+                    <h2 style="margin-bottom: 20px; color: #00d4ff;">Activity Logs</h2>
+                    <button class="btn" onclick="refreshLogs()" style="margin-bottom: 20px;">🔄 Aktualisieren</button>
+                    <div class="logs-container" id="logsList">
+                        <div class="loading"><div class="spinner"></div> Lädt...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let adminToken = null;
+        let isAdmin = false;
+
+        const messageDiv = document.getElementById('message');
+
+        function showMessage(text, type = 'info') {
+            messageDiv.textContent = text;
+            messageDiv.className = 'message ' + type;
+            messageDiv.style.display = 'block';
+            setTimeout(() => {
+                messageDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('adminToken');
+            window.location.href = '/';
+        }
+
+        async function authenticateAdmin() {
+            const pwd = document.getElementById('adminPassword').value;
+            if (!pwd) return;
+
+            try {
+                // Send just the password - no user token required
+                const res = await fetch('/api/admin/auth', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: pwd })
+                });
+
+                const data = await res.json();
+                if (res.ok && data.admin_token) {
+                    adminToken = data.admin_token;
+                    localStorage.setItem('adminToken', adminToken);
+                    isAdmin = true;
+                    document.getElementById('loginRequired').classList.add('hidden');
+                    document.getElementById('adminPanel').classList.remove('hidden');
+                    loadGames();
+                    refreshLogs();
+                    showMessage('Admin-Zugriff gewährt!', 'success');
+                } else {
+                    showMessage('Falsches Passwort!', 'error');
+                }
+            } catch (e) {
+                showMessage('Fehler: ' + e.message, 'error');
+            }
+        }
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById(tab + 'Tab').classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        async function loadGames() {
+            try {
+                const res = await fetch('/api/admin/games', {
+                    headers: { 'Authorization': 'Bearer ' + adminToken }
+                });
+                
+                if (!res.ok) {
+                    const errorText = await res.text();
+                    console.error(`API Error: ${res.status} - ${errorText}`);
+                    try {
+                        const errorJson = JSON.parse(errorText);
+                        showMessage('Fehler: ' + (errorJson.error || 'Unbekannter Fehler'), 'error');
+                    } catch {
+                        showMessage('Server Fehler: ' + res.status, 'error');
+                    }
+                    return;
+                }
+                
+                const games = await res.json();
+                
+                const gamesList = document.getElementById('gamesList');
+                if (!games || games.length === 0) {
+                    gamesList.innerHTML = '<p style="color: #888;">Keine Games verfügbar</p>';
+                    return;
+                }
+
+                gamesList.innerHTML = games.map(g => `
+                    <div class="game-card">
+                        <h3>${escapeHtml(g.gamename)}</h3>
+                        <p>${escapeHtml(g.gamedescription)}</p>
+                        <span class="status ${g.is_active ? 'active' : 'inactive'}">
+                            ${g.is_active ? '✓ Aktiv' : '✗ Inaktiv'}
+                        </span>
+                        <div class="cmd">${escapeHtml(g.launch_command)}</div>
+                        <div class="actions">
+                            <button class="btn ${g.is_active ? 'danger' : ''}" onclick="toggleGame(${g.gameid}, ${g.is_active})">
+                                ${g.is_active ? 'Deaktivieren' : 'Aktivieren'}
+                            </button>
+                            <button class="btn danger" onclick="deleteGame(${g.gameid})">Löschen</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (e) {
+                console.error('Exception:', e);
+                showMessage('Fehler beim Laden: ' + e.message, 'error');
+            }
+        }
+
+        async function addGame(e) {
+            e.preventDefault();
+            
+            const name = document.getElementById('gameName').value;
+            const desc = document.getElementById('gameDesc').value;
+            const cmd = document.getElementById('gameCmd').value;
+
+            try {
+                const res = await fetch('/api/admin/game', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + adminToken
+                    },
+                    body: JSON.stringify({ gamename: name, gamedesc: desc, command: cmd })
+                });
+
+                const data = await res.json();
+                if (res.ok) {
+                    showMessage('Game hinzugefügt!', 'success');
+                    document.getElementById('gameName').value = '';
+                    document.getElementById('gameDesc').value = '';
+                    document.getElementById('gameCmd').value = '';
+                    loadGames();
+                } else {
+                    showMessage(data.error || 'Fehler beim Hinzufügen', 'error');
+                }
+            } catch (e) {
+                showMessage('Fehler: ' + e.message, 'error');
+            }
+        }
+
+        async function toggleGame(gameid, currentActive) {
+            try {
+                const res = await fetch(`/api/admin/game/${gameid}/toggle`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + adminToken
+                    }
+                });
+
+                if (res.ok) {
+                    showMessage('Game aktualisiert!', 'success');
+                    loadGames();
+                } else {
+                    showMessage('Fehler beim Aktualisieren', 'error');
+                }
+            } catch (e) {
+                showMessage('Fehler: ' + e.message, 'error');
+            }
+        }
+
+        async function deleteGame(gameid) {
+            if (!confirm('Wirklich löschen?')) return;
+
+            try {
+                const res = await fetch(`/api/admin/game/${gameid}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': 'Bearer ' + adminToken }
+                });
+
+                if (res.ok) {
+                    showMessage('Game gelöscht!', 'success');
+                    loadGames();
+                } else {
+                    showMessage('Fehler beim Löschen', 'error');
+                }
+            } catch (e) {
+                showMessage('Fehler: ' + e.message, 'error');
+            }
+        }
+
+        async function refreshLogs() {
+            try {
+                const res = await fetch('/api/admin/logs', {
+                    headers: { 'Authorization': 'Bearer ' + adminToken }
+                });
+                
+                if (!res.ok) {
+                    const errorText = await res.text();
+                    console.error(`API Error: ${res.status} - ${errorText}`);
+                    try {
+                        const errorJson = JSON.parse(errorText);
+                        showMessage('Fehler: ' + (errorJson.error || 'Unbekannter Fehler'), 'error');
+                    } catch {
+                        showMessage('Server Fehler: ' + res.status, 'error');
+                    }
+                    return;
+                }
+                
+                const logs = await res.json();
+                
+                const logsList = document.getElementById('logsList');
+                if (!logs || logs.length === 0) {
+                    logsList.innerHTML = '<p style="color: #888;">Keine Logs verfügbar</p>';
+                    return;
+                }
+
+                logsList.innerHTML = logs.map(log => {
+                    const date = new Date(log.timestamp * 1000);
+                    return `
+                        <div class="log-entry ${log.action}">
+                            <div><span class="log-time">${date.toLocaleString('de-DE')}</span></div>
+                            <div><span class="log-user">User ${log.userid}</span> - ${escapeHtml(log.action)}</div>
+                            ${log.details ? `<div style="color: #999; margin-top: 5px;">Details: ${escapeHtml(log.details)}</div>` : ''}
+                        </div>
+                    `;
+                }).join('');
+            } catch (e) {
+                console.error('Exception:', e);
+                showMessage('Fehler beim Laden von Logs: ' + e.message, 'error');
+            }
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // On load
+        window.addEventListener('load', () => {
+            // Check if admin is already authenticated
+            const savedAdminToken = localStorage.getItem('adminToken');
+            if (savedAdminToken) {
+                adminToken = savedAdminToken;
+                isAdmin = true;
+                document.getElementById('loginRequired').classList.add('hidden');
+                document.getElementById('adminPanel').classList.remove('hidden');
+                loadGames();
+                refreshLogs();
+            } else {
+                // Show login form - no session token required for admin auth
+                document.getElementById('loginRequired').classList.remove('hidden');
+                document.getElementById('adminPanel').classList.add('hidden');
+            }
+        });
+
+        // Auto-refresh logs every 30 seconds
+        setInterval(() => {
+            if (isAdmin && document.getElementById('logsTab').classList.contains('active')) {
+                refreshLogs();
+            }
+        }, 30000);
+    </script>
+</body>
+</html>

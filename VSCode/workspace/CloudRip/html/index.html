@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CloudRip - Cloud Gaming</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #e0e0e0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .login-container {
+            background: rgba(22, 33, 62, 0.8);
+            border: 1px solid #0f3460;
+            border-radius: 10px;
+            padding: 40px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .logo h1 {
+            font-size: 32px;
+            color: #00d4ff;
+            margin-bottom: 5px;
+            text-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
+        }
+
+        .logo p {
+            color: #888;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #a0a0a0;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            background: #0f1419;
+            border: 1px solid #0f3460;
+            border-radius: 5px;
+            color: #e0e0e0;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #00d4ff;
+            box-shadow: 0 0 10px rgba(0, 212, 255, 0.2);
+        }
+
+        .btn {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #00d4ff 0%, #0099cc 100%);
+            border: none;
+            border-radius: 5px;
+            color: #000;
+            font-weight: bold;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 10px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 212, 255, 0.3);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn.secondary {
+            background: #0f3460;
+            color: #00d4ff;
+            border: 1px solid #00d4ff;
+        }
+
+        .btn.secondary:hover {
+            background: #0f3460;
+            box-shadow: 0 0 15px rgba(0, 212, 255, 0.4);
+        }
+
+        .message {
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .message.error {
+            background: rgba(255, 0, 0, 0.1);
+            border: 1px solid #ff4444;
+            color: #ff8888;
+        }
+
+        .message.success {
+            background: rgba(0, 255, 0, 0.1);
+            border: 1px solid #44ff44;
+            color: #88ff88;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            color: #888;
+            font-size: 14px;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #0f3460;
+            border-top-color: #00d4ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .switch-mode {
+            text-align: center;
+            margin-top: 20px;
+            color: #888;
+            font-size: 14px;
+        }
+
+        .switch-mode a {
+            color: #00d4ff;
+            cursor: pointer;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .switch-mode a:hover {
+            text-decoration: underline;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .admin-link {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #0f3460;
+        }
+
+        .admin-link a {
+            color: #00d4ff;
+            text-decoration: none;
+            font-size: 14px;
+        }
+
+        .admin-link a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="logo">
+            <h1>☁️ CloudRip</h1>
+            <p>Cloud Gaming Platform</p>
+        </div>
+
+        <div class="message" id="message"></div>
+        <div class="loading" id="loading"></div>
+
+        <!-- Login Form -->
+        <div id="loginForm">
+            <form onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" id="username" placeholder="z.B. test" required>
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="password" placeholder="z.B. test" required>
+                </div>
+                <button type="submit" class="btn">Login</button>
+                <div class="switch-mode">
+                    Noch kein Konto? <a onclick="switchToRegister()">Registrieren</a>
+                    <br><small><a onclick="clearLocalStorage()" style="cursor:pointer; color:#999;">Cache clearen</a></small>
+                </div>
+            </form>
+        </div>
+
+        <!-- Register Form -->
+        <div id="registerForm" class="hidden">
+            <form onsubmit="handleRegister(event)">
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" id="regUsername" placeholder="Benutzername" required>
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="regPassword" placeholder="Passwort" required>
+                </div>
+                <div class="form-group">
+                    <label>Password wiederholen</label>
+                    <input type="password" id="regPassword2" placeholder="Passwort nochmal" required>
+                </div>
+                <button type="submit" class="btn">Registrieren</button>
+                <div class="switch-mode">
+                    Bereits registriert? <a onclick="switchToLogin()">Login</a>
+                </div>
+            </form>
+        </div>
+
+        <div class="admin-link">
+            <a href="/admin">Admin Panel</a>
+        </div>
+    </div>
+
+    <script>
+        const messageDiv = document.getElementById('message');
+        const loadingDiv = document.getElementById('loading');
+
+        function showMessage(text, type = 'error') {
+            messageDiv.textContent = text;
+            messageDiv.className = 'message ' + type;
+            messageDiv.style.display = 'block';
+            setTimeout(() => {
+                messageDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        function showLoading(show = true) {
+            if (show) {
+                loadingDiv.innerHTML = '<div class="spinner"></div> Bitte warten...';
+                loadingDiv.style.display = 'block';
+            } else {
+                loadingDiv.style.display = 'none';
+            }
+        }
+
+        function switchToRegister() {
+            document.getElementById('loginForm').classList.add('hidden');
+            document.getElementById('registerForm').classList.remove('hidden');
+            messageDiv.style.display = 'none';
+        }
+
+        function switchToLogin() {
+            document.getElementById('registerForm').classList.add('hidden');
+            document.getElementById('loginForm').classList.remove('hidden');
+            messageDiv.style.display = 'none';
+        }
+
+        function clearLocalStorage() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('userid');
+            showMessage('Cache geleert! Browser wird neu geladen...', 'success');
+            setTimeout(() => location.reload(), 1000);
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            showLoading(true);
+
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await res.json();
+
+                if (res.ok && data.token) {
+                    localStorage.setItem('token', data.token);
+                    localStorage.setItem('userid', data.userid);
+                    showMessage('Login erfolgreich! Weiterleitung...', 'success');
+                    setTimeout(() => {
+                        window.location.href = '/game';
+                    }, 1000);
+                } else {
+                    showMessage(data.error || 'Login fehlgeschlagen');
+                }
+            } catch (e) {
+                showMessage('Fehler: ' + e.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function handleRegister(e) {
+            e.preventDefault();
+            showLoading(true);
+
+            const username = document.getElementById('regUsername').value;
+            const password = document.getElementById('regPassword').value;
+            const password2 = document.getElementById('regPassword2').value;
+
+            if (password !== password2) {
+                showMessage('Passwörter stimmen nicht überein');
+                showLoading(false);
+                return;
+            }
+
+            if (password.length < 4) {
+                showMessage('Passwort muss mindestens 4 Zeichen lang sein');
+                showLoading(false);
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await res.json();
+
+                if (res.ok) {
+                    showMessage('Registrierung erfolgreich! Bitte einloggen.', 'success');
+                    setTimeout(() => {
+                        switchToLogin();
+                        document.getElementById('username').value = username;
+                        document.getElementById('password').value = password;
+                    }, 1000);
+                } else {
+                    showMessage(data.error || 'Registrierung fehlgeschlagen');
+                }
+            } catch (e) {
+                showMessage('Fehler: ' + e.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Prüfe ob bereits eingeloggt - validiere Token vor Redirect
+        window.addEventListener('load', () => {
+            const token = localStorage.getItem('token');
+            if (token) {
+                // Token existiert - gehe zu game
+                window.location.href = '/game';
+            } else {
+                // Kein Token - zeige Login-Form (default)
+                switchToLogin();
+            }
+        });
+    </script>
+</body>
+</html>

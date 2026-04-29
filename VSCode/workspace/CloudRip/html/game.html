@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CloudRip - Gaming</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0a0a0a;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #e0e0e0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            background: rgba(15, 20, 25, 0.9);
+            padding: 15px 20px;
+            border-bottom: 1px solid #0f3460;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        h1 {
+            font-size: 20px;
+            color: #00d4ff;
+        }
+
+        .header-right {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .status-bar {
+            display: flex;
+            gap: 20px;
+            font-size: 13px;
+        }
+
+        .status-item {
+            padding: 5px 10px;
+            background: rgba(0, 212, 255, 0.1);
+            border-radius: 3px;
+            border: 1px solid #0f3460;
+        }
+
+        .status-item.error {
+            background: rgba(255, 0, 0, 0.1);
+            border-color: #ff4444;
+            color: #ff8888;
+        }
+
+        .status-item.success {
+            background: rgba(0, 255, 0, 0.1);
+            border-color: #44ff44;
+            color: #88ff88;
+        }
+
+        .logout-btn {
+            background: #ff4444;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 13px;
+        }
+
+        .logout-btn:hover {
+            background: #ff6666;
+        }
+
+        .container {
+            display: flex;
+            flex: 1;
+            gap: 20px;
+            padding: 20px;
+            max-width: 1600px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .game-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .video-container {
+            background: #000;
+            border: 1px solid #0f3460;
+            border-radius: 10px;
+            overflow: hidden;
+            aspect-ratio: 16 / 9;
+            position: relative;
+        }
+
+        #stream {
+            width: 100%;
+            height: 100%;
+            display: block;
+            object-fit: contain;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #00d4ff 0%, #0099cc 100%);
+            border: none;
+            border-radius: 5px;
+            color: #000;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 212, 255, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn.secondary {
+            background: #0f3460;
+            color: #00d4ff;
+            border: 1px solid #00d4ff;
+        }
+
+        .btn.secondary:hover {
+            background: #0f3460;
+            box-shadow: 0 0 15px rgba(0, 212, 255, 0.4);
+        }
+
+        .btn.danger {
+            background: linear-gradient(135deg, #ff4444 0%, #cc0000 100%);
+            color: white;
+        }
+
+        .btn.danger:hover {
+            box-shadow: 0 8px 20px rgba(255, 0, 0, 0.3);
+        }
+
+        .sidebar {
+            width: 280px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .panel {
+            background: rgba(22, 33, 62, 0.8);
+            border: 1px solid #0f3460;
+            border-radius: 10px;
+            padding: 20px;
+        }
+
+        .panel h2 {
+            color: #00d4ff;
+            font-size: 14px;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .game-selector {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .game-item {
+            padding: 12px;
+            margin-bottom: 8px;
+            background: #0f1419;
+            border: 1px solid #0f3460;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 13px;
+        }
+
+        .game-item:hover {
+            border-color: #00d4ff;
+            background: rgba(0, 212, 255, 0.05);
+        }
+
+        .game-item.selected {
+            background: rgba(0, 212, 255, 0.1);
+            border-color: #00d4ff;
+            color: #00d4ff;
+            font-weight: bold;
+        }
+
+        .message {
+            padding: 12px;
+            border-radius: 5px;
+            font-size: 13px;
+            display: none;
+            margin-bottom: 15px;
+        }
+
+        .message.error {
+            background: rgba(255, 0, 0, 0.1);
+            border: 1px solid #ff4444;
+            color: #ff8888;
+        }
+
+        .message.success {
+            background: rgba(0, 255, 0, 0.1);
+            border: 1px solid #44ff44;
+            color: #88ff88;
+        }
+
+        .message.info {
+            background: rgba(0, 212, 255, 0.1);
+            border: 1px solid #00d4ff;
+            color: #88ddff;
+        }
+
+        .loading {
+            text-align: center;
+            color: #888;
+            padding: 20px;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #0f3460;
+            border-top-color: #00d4ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 1200px) {
+            .container {
+                flex-direction: column;
+            }
+
+            .sidebar {
+                width: 100%;
+                flex-direction: row;
+                gap: 15px;
+                overflow-x: auto;
+            }
+
+            .sidebar > div {
+                flex: 1;
+                min-width: 250px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>☁️ CloudRip</h1>
+        <div class="header-right">
+            <div class="status-bar">
+                <div class="status-item" id="connectionStatus">⚪ Bereit</div>
+                <div class="status-item" id="latencyStatus">📡 - ms</div>
+            </div>
+            <button class="logout-btn" onclick="logout()">Logout</button>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="game-area">
+            <div class="message" id="message"></div>
+            
+            <div class="video-container">
+                <video id="stream" autoplay playsinline muted></video>
+            </div>
+
+            <div class="controls">
+                <button class="btn" id="selectBtn" onclick="selectGameModal()">🎮 Spiel wählen</button>
+                <button class="btn" id="connectBtn" onclick="connectSession()" disabled>🚀 Verbinden</button>
+                <button class="btn danger" id="disconnectBtn" onclick="disconnect()" disabled>⏹️ Trennen</button>
+            </div>
+        </div>
+
+        <div class="sidebar">
+            <div class="panel">
+                <h2>Verfügbare Spiele</h2>
+                <div class="game-selector" id="gamesList">
+                    <div class="loading"><div class="spinner"></div></div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2>Informationen</h2>
+                <div style="font-size: 13px; color: #888; line-height: 1.6;">
+                    <p><strong>Aktuelles Spiel:</strong></p>
+                    <p id="selectedGame" style="color: #00d4ff;">Keine Auswahl</p>
+                    <p style="margin-top: 15px;"><strong>Verbindungsstatus:</strong></p>
+                    <p id="connStatus" style="color: #888;">Getrennt</p>
+                    <p style="margin-top: 15px;"><strong>Tipps:</strong></p>
+                    <ul style="margin-left: 15px; color: #666;">
+                        <li>Maus und Tastatur werden automatisch erfasst</li>
+                        <li>Rechtsklick zum Kontextmenü</li>
+                        <li>ESC zum Beenden</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let token = null;
+        let selectedGameId = null;
+        let selectedGameName = null;
+        let pc = null;
+        let dataChannel = null;
+        let isConnected = false;
+
+        const messageDiv = document.getElementById('message');
+
+        function showMessage(text, type = 'info') {
+            messageDiv.textContent = text;
+            messageDiv.className = 'message ' + type;
+            messageDiv.style.display = 'block';
+            setTimeout(() => {
+                messageDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        function updateStatus(text, type = 'info') {
+            const status = document.getElementById('connectionStatus');
+            const symbols = { info: '⚪', success: '🟢', error: '🔴' };
+            status.textContent = symbols[type] + ' ' + text;
+            status.className = 'status-item ' + type;
+        }
+
+        function logout() {
+            localStorage.removeItem('token');
+            window.location.href = '/';
+        }
+
+        async function loadGames() {
+            try {
+                const res = await fetch('/api/games', {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                
+                // Check if response is OK
+                if (!res.ok) {
+                    const errorText = await res.text();
+                    console.error(`API Error: ${res.status} - ${errorText}`);
+                    
+                    // Try to parse as JSON
+                    try {
+                        const errorJson = JSON.parse(errorText);
+                        showMessage('Fehler: ' + (errorJson.error || 'Unbekannter Fehler'), 'error');
+                    } catch {
+                        showMessage('Server Fehler: ' + res.status, 'error');
+                    }
+                    
+                    if (res.status === 401) {
+                        setTimeout(() => window.location.href = '/', 2000);
+                    }
+                    return;
+                }
+                
+                const contentType = res.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    console.error('Invalid Content-Type:', contentType);
+                    const text = await res.text();
+                    console.error('Response body:', text.substring(0, 200));
+                    showMessage('Server gab ungültiges Format zurück', 'error');
+                    return;
+                }
+                
+                const games = await res.json();
+
+                const list = document.getElementById('gamesList');
+                if (!games || games.length === 0) {
+                    list.innerHTML = '<p style="color: #888;">Keine Spiele verfügbar</p>';
+                    return;
+                }
+
+                list.innerHTML = games.map(g => `
+                    <div class="game-item ${selectedGameId === g.gameid ? 'selected' : ''}" 
+                         onclick="selectGame(${g.gameid}, '${escapeHtml(g.gamename)}')">
+                        <strong>${escapeHtml(g.gamename)}</strong><br>
+                        <span style="color: #666; font-size: 11px;">${escapeHtml(g.gamedescription)}</span>
+                    </div>
+                `).join('');
+            } catch (e) {
+                console.error('Exception:', e);
+                showMessage('Fehler beim Laden: ' + e.message, 'error');
+            }
+        }
+
+        function selectGame(gameid, name) {
+            selectedGameId = gameid;
+            selectedGameName = name;
+            document.getElementById('selectedGame').textContent = name;
+            document.getElementById('connectBtn').disabled = false;
+            document.querySelectorAll('.game-item').forEach(el => el.classList.remove('selected'));
+            event.target.closest('.game-item').classList.add('selected');
+            showMessage('Spiel ausgewählt: ' + name, 'success');
+        }
+
+        function selectGameModal() {
+            const gamesList = document.getElementById('gamesList');
+            gamesList.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        async function connectSession() {
+            if (!selectedGameId) {
+                showMessage('Bitte erst ein Spiel auswählen!', 'error');
+                return;
+            }
+
+            updateStatus('Verbindung wird hergestellt...', 'info');
+
+            try {
+                // Starte Session
+                const resStart = await fetch('/api/session/start', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + token
+                    },
+                    body: JSON.stringify({ gameid: selectedGameId })
+                });
+
+                if (!resStart.ok) {
+                    throw new Error('Session-Start fehlgeschlagen');
+                }
+
+                const startData = await resStart.json();
+                const sessionId = startData.sessionid;
+                const serverOffer = startData.sdp;  // Server schickt Offer
+
+                // Initialisiere WebRTC
+                pc = new RTCPeerConnection({
+                    iceServers: [{ urls: ['stun:stun.l.google.com:19302'] }]
+                });
+
+                pc.ontrack = (event) => {
+                    console.log('Track erhalten:', event.track.kind, 'streams:', event.streams.length);
+                    const video = document.getElementById('stream');
+                    if (event.streams && event.streams[0]) {
+                        video.srcObject = event.streams[0];
+                    } else {
+                        // Fallback: manuell einen MediaStream aus dem Track bauen
+                        if (!video.srcObject) {
+                            video.srcObject = new MediaStream();
+                        }
+                        video.srcObject.addTrack(event.track);
+                    }
+                    video.play().catch(e => console.warn('Autoplay blocked:', e));
+                };
+
+                pc.onconnectionstatechange = () => {
+                    console.log('Connection State:', pc.connectionState);
+                    if (pc.connectionState === 'connected' || pc.connectionState === 'completed') {
+                        isConnected = true;
+                        updateStatus('Verbunden', 'success');
+                        document.getElementById('connStatus').textContent = '✓ Verbunden';
+                        document.getElementById('disconnectBtn').disabled = false;
+                        document.getElementById('connectBtn').disabled = true;
+                    }
+                };
+
+                // Registriere ICE-Kandidaten-Handler BEVOR wir LocalDescription setzen!
+                pc.onicecandidate = async (event) => {
+                    if (event.candidate) {
+                        console.log('ICE Candidate:', event.candidate.candidate);
+                        await fetch('/api/session/candidate', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': 'Bearer ' + token
+                            },
+                            body: JSON.stringify({
+                                sessionid: sessionId,
+                                candidate: event.candidate.candidate,
+                                sdpMLineIndex: event.candidate.sdpMLineIndex,
+                                sdpMid: event.candidate.sdpMid
+                            })
+                        });
+                    }
+                };
+
+                // Setze Server-Offer als Remote Description
+                const remoteOffer = new RTCSessionDescription({
+                    type: 'offer',
+                    sdp: serverOffer
+                });
+                await pc.setRemoteDescription(remoteOffer);
+
+                // Erstelle Answer
+                const answer = await pc.createAnswer();
+                await pc.setLocalDescription(answer);
+
+                // Sende Answer
+                const resAnswer = await fetch('/api/session/answer', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + token
+                    },
+                    body: JSON.stringify({
+                        sessionid: sessionId,
+                        sdp: pc.localDescription.sdp
+                    })
+                });
+
+                if (!resAnswer.ok) {
+                    throw new Error('Answer fehlgeschlagen');
+                }
+
+                // Starte Kandidaten-Polling: Hole Server-Kandidaten
+                let lastCandidateIndex = 0;
+                const candidatePollInterval = setInterval(async () => {
+                    try {
+                        const resCandidates = await fetch('/api/session/candidates?index=' + lastCandidateIndex, {
+                            method: 'GET',
+                            headers: {
+                                'Authorization': 'Bearer ' + token
+                            }
+                        });
+                        
+                        if (resCandidates.ok) {
+                            const candidateData = await resCandidates.json();
+                            if (candidateData.candidates && Array.isArray(candidateData.candidates)) {
+                                for (let cand of candidateData.candidates) {
+                                    if (cand.candidate) {
+                                        console.log('Adding server candidate:', cand.candidate);
+                                        pc.addIceCandidate(new RTCIceCandidate({
+                                            candidate: cand.candidate,
+                                            sdpMLineIndex: cand.sdpMLineIndex || 0,
+                                            sdpMid: cand.sdpMid || 'video'
+                                        }));
+                                    }
+                                }
+                                lastCandidateIndex = candidateData.total || 0;
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Candidate polling error:', e);
+                    }
+                }, 200);
+
+                // Stoppe Polling wenn die Verbindung stabil ist
+                const stopPollingOnConnect = () => {
+                    if (pc.connectionState === 'connected' || pc.connectionState === 'completed') {
+                        clearInterval(candidatePollInterval);
+                        pc.removeEventListener('connectionstatechange', stopPollingOnConnect);
+                    }
+                };
+                pc.addEventListener('connectionstatechange', stopPollingOnConnect);
+
+                setupInputHandling();
+                showMessage('Verbunden!', 'success');
+            } catch (e) {
+                updateStatus('Fehler: ' + e.message, 'error');
+                showMessage('Verbindung fehlgeschlagen: ' + e.message, 'error');
+            }
+        }
+
+        function setupInputHandling() {
+            const video = document.getElementById('stream');
+            let lastMouseMove = 0;
+            let pendingMouseMove = null;
+            let inputInFlight = false;
+            const inputQueue = [];
+
+            function flushInputQueue() {
+                if (inputInFlight || inputQueue.length === 0) return;
+                const data = inputQueue.shift();
+                inputInFlight = true;
+                fetch('/api/input', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                    body: JSON.stringify(data)
+                }).catch(() => {}).finally(() => {
+                    inputInFlight = false;
+                    flushInputQueue();
+                });
+            }
+
+            function sendInput(data) {
+                if (!isConnected) return;
+                inputQueue.push(data);
+                if (inputQueue.length > 8) inputQueue.splice(0, inputQueue.length - 8);
+                flushInputQueue();
+            }
+
+            function scaleCoords(e) {
+                const rect = video.getBoundingClientRect();
+                return {
+                    x: Math.round((e.clientX - rect.left) * (video.videoWidth / rect.width)),
+                    y: Math.round((e.clientY - rect.top) * (video.videoHeight / rect.height))
+                };
+            }
+
+            video.addEventListener('mousemove', (e) => {
+                const now = Date.now();
+                if (now - lastMouseMove < 33) return;
+                lastMouseMove = now;
+                const {x, y} = scaleCoords(e);
+                sendInput({ type: 'mousemove', x, y });
+            });
+
+            video.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                const {x, y} = scaleCoords(e);
+                sendInput({ type: 'mousedown', x, y, button: e.button });
+            });
+
+            video.addEventListener('mouseup', (e) => {
+                const {x, y} = scaleCoords(e);
+                sendInput({ type: 'mouseup', x, y, button: e.button });
+            });
+
+            video.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                sendInput({ type: 'wheel', dx: Math.round(e.deltaX), dy: Math.round(e.deltaY) });
+            }, { passive: false });
+
+            document.addEventListener('keydown', (e) => {
+                sendInput({ type: 'keydown', key: e.key, code: e.code });
+            });
+
+            document.addEventListener('keyup', (e) => {
+                sendInput({ type: 'keyup', key: e.key, code: e.code });
+            });
+        }
+
+
+        function disconnect() {
+            if (pc) {
+                pc.close();
+                pc = null;
+            }
+            isConnected = false;
+            document.getElementById('stream').srcObject = null;
+            document.getElementById('disconnectBtn').disabled = true;
+            document.getElementById('connectBtn').disabled = false;
+            updateStatus('Getrennt', 'error');
+            document.getElementById('connStatus').textContent = 'Getrennt';
+            showMessage('Verbindung getrennt', 'info');
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // On load
+        window.addEventListener('load', () => {
+            token = localStorage.getItem('token');
+            if (!token) {
+                window.location.href = '/';
+                return;
+            }
+            loadGames();
+        });
+    </script>
+</body>
+</html>
