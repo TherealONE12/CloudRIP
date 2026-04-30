@@ -1,44 +1,47 @@
 
 # ☁️ CloudRip
 
-**CloudRip** ist ein in C geschriebener, selbstgehosteter Cloud-Gaming-Server. Er isoliert Spiele in Docker-Containern und streamt sie via **WebRTC** direkt in den Browser. 
+**CloudRip** is a self-hosted cloud gaming server written in **C**. It runs games inside isolated Docker containers and streams them to any modern browser via **WebRTC**.
 
-*   **Keine Plugins** erforderlich.
-*   **Keine Client-Installation** nötig.
-*   **Geringe Latenz** durch WebRTC-Datenkanäle.
+*   **No plugins** or client installations required.
+*   **High performance** using VP8 video encoding.
+*   **Low latency** via direct WebRTC DataChannels for input.
 
 ---
 
-## ⚙️ Funktionsweise
+## ⚙️ How It Works
 
-Jede Spiel-Session läuft in einem isolierten Docker-Container mit einem virtuellen X11-Display (**Xvfb**). 
-1.  **Video:** `ffmpeg` greift das X11-Display ab und streamt VP8-Video via WebRTC.
-2.  **Input:** Maus- und Tastatureingaben werden vom Browser über den WebRTC-DataChannel gesendet und mittels `libxdo` direkt in den Container injiziert.
+Each session is assigned an isolated Docker container equipped with a virtual X11 display (**Xvfb**). 
 
-### Datenfluss-Diagramm
+1.  **Video Stream:** `ffmpeg` captures the X11 display and streams it as VP8 video over WebRTC.
+2.  **Input Handling:** Keyboard and mouse events are sent from the browser via the WebRTC DataChannel and injected into the container using `libxdo`.
 
-| Kanal | Wegbeschreibung |
+### Data Flow Diagram
+
+
+
+| Path | Components |
 | :--- | :--- |
-| **Video** | `Browser` ◀—— `WebRTC` ◀—— `ffmpeg` ◀—— `Xvfb` |
-| **Input** | `Browser` ——▶ `DataChannel` ——▶ `libxdo` ——▶ `Xvfb` |
+| **Video** | `Browser` ◀—— `WebRTC (VP8)` ◀—— `stream_loop` ◀—— `ffmpeg` ◀—— `Xvfb` |
+| **Input** | `Browser` ——▶ `DataChannel` ——▶ `onDataChannelMessage` ——▶ `libxdo` ——▶ `Xvfb` |
 
 ---
 
-## 🛠 Voraussetzungen
+## 🛠 Requirements
 
-Folgende Pakete müssen auf dem Host-System installiert sein:
+The following system packages are required on the host machine:
 
-*   **Build-Tools:** `gcc`, `make`
-*   **Virtualisierung:** `docker` (Daemon muss aktiv sein)
+*   **Build Tools:** `gcc`, `make`
+*   **Virtualization:** `docker` (daemon must be running)
 *   **X11 & Input:** `Xvfb`, `xdotool`, `libxdo`, `libX11`
-*   **Web & Krypto:** `libdatachannel`, `libmicrohttpd`, `libsqlite3`, `libsodium`
+*   **Web & Crypto:** `libdatachannel`, `libmicrohttpd`, `libsqlite3`, `libsodium`
 
 ---
 
 ## 🚀 Installation & Build
 
-### 1. Kompilieren des Servers
-Führe diesen Befehl im Projektverzeichnis aus, um die ausführbare Datei zu erstellen:
+### 1. Compile the Server
+Run the following command from the repository root:
 
 ```bash
 mkdir -p build
@@ -49,8 +52,8 @@ gcc -g -Wall -Wextra \
     -ldatachannel -lm -lpthread -l:libmicrohttpd.so.12 -ldl -lsqlite3 -lsodium -lxdo -lX11
 ```
 
-### 2. Game-Container vorbereiten
-Bevor eine Session gestartet werden kann, muss das Basis-Image für die Spiele gebaut werden:
+### 2. Build the Game Image
+A base Docker image is required before any session can start:
 
 ```bash
 docker build -t cloudrip-container .
@@ -58,52 +61,52 @@ docker build -t cloudrip-container .
 
 ---
 
-## 📋 Betrieb
+## 📋 Running the Server
 
-Starten Sie den Server immer aus dem **Root-Verzeichnis** des Repos, damit die Pfade zu `/html` und `/data` korrekt gefunden werden:
+Execute the binary from the **root directory** so that paths to `html/` and `data/` resolve correctly:
 
 ```bash
 ./build/cloudrip
 ```
 
-*   **URL:** `http://localhost:8000`
-*   **Datenbank:** Wird automatisch unter `data/database.db` angelegt.
+*   **Port:** The server listens on `8000`.
+*   **Database:** Automatically created at `data/database.db` on first launch.
 
-### Standard-Accounts
+### Default Credentials
 
-| Benutzername | Passwort | Rolle |
+| Username | Password | Role |
 | :--- | :--- | :--- |
 | `admin` | `admin` | Administrator |
-| `test` | `test` | Standard-User |
+| `test` | `test` | Standard User |
 
 ---
 
-## 🎮 Spiele hinzufügen
+## 🎮 Game Management
 
-Neue Spiele können einfach über die Datenbank oder das Admin-Panel hinzugefügt werden.
+### Adding a Game
+You can add games via the Admin Panel or by inserting a row into the SQLite database:
 
-### Beispiel via SQL:
 ```sql
 INSERT INTO games (gamename, gamedescription, launch_command, is_active)
-VALUES ('My Game', 'Ein cooles Spiel', 'command-to-run', 1);
+VALUES ('My Game', 'Game Description', 'the-launch-command', 1);
 ```
-> **Hinweis:** Der `launch_command` wird innerhalb des Containers via `/bin/sh -c` ausgeführt. `DISPLAY` ist bereits vorkonfiguriert.
+> **Note:** The `launch_command` runs inside the container via `/bin/sh -c`. The `DISPLAY` environment variable is automatically pre-configured.
 
 ---
 
-## 📂 Architektur-Übersicht
+## 📂 Architecture Overview
 
-| Datei | Beschreibung |
+| File | Purpose |
 | :--- | :--- |
-| `src/main.c` | Einstiegspunkt, HTTP-Server & Passwort-Logik. |
-| `src/multimanager.c` | Verwaltung der WebRTC-Sessions & Streaming-Threads. |
-| `src/api_handlers.c` | Logik für Auth, Games-CRUD und Session-Management. |
-| `src/docker.c` | Steuerung der Docker-Container und Input-Injection. |
+| `src/main.c` | HTTP server (libmicrohttpd), DB initialization, and password hashing. |
+| `src/multimanager.c` | WebRTC lifecycle, streaming threads, and session launching. |
+| `src/api_handlers.c` | Logic for Auth, Token management, and Game CRUD. |
+| `src/docker.c` | Docker daemon communication and `libxdo` input injection. |
 
 ---
 
-## 🤖 KI-Nutzung
-Dieses Projekt wurde unter Zuhilfenahme von KI (Claude/Copilot) realisiert:
-*   **Frontend:** Alle HTML/CSS-Dateien wurden mit KI-Unterstützung erstellt.
-*   **Stabilität:** Die KI half dabei, den ursprünglichen C-Code (Single-User) für den Multi-User-Betrieb abzusichern, um Abstürze bei parallelen Zugriffen zu verhindern.
-*   **Readme:** Gemini hat den Plaintext in Makrdown verwandelt.
+## 🤖 AI Usage Disclosure
+Artificial Intelligence (Claude/Copilot) was utilized in the following areas:
+*   **Frontend:** All HTML/CSS files were AI-generated.
+*   **Stability:** AI was used to refactor the core C logic from a "proof of concept" to a robust multi-user system, ensuring the server handles concurrent connections without crashing.
+*   **Readme:** Translated to markdown format and to englisch.
